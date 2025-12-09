@@ -1,0 +1,41 @@
+# IDE配置
+.trae/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 数据库文件
+*.db
+*.sqlite3
+
+# Python虚拟环境
+venv/
+env/
+.env
+
+# 日志文件
+*.log
+logs/
+
+# 依赖文件
+__pycache__/
+*.pyc
+*.pyo
+
+# 测试文件
+.coverage
+.pytest_cache/
+
+# 构建文件
+build/
+dist/
+*.egg-info/
+
+# OS文件
+.DS_Store
+Thumbs.db
+
+# 其他
+.cache/

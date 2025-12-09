@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基于大模型的轻量化记忆系统</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fa fa-brain"></i> 记忆系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#submit-tab" data-bs-toggle="tab">提交聊天历史</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#query-tab" data-bs-toggle="tab">查询记忆</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#manage-tab" data-bs-toggle="tab">管理记忆</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#config-tab" data-bs-toggle="tab">配置</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区域 -->
+    <main class="container mt-4 mb-4">
+        <!-- 标签页内容 -->
+        <div class="tab-content" id="myTabContent">
+            <!-- 聊天历史提交标签页 -->
+            <div class="tab-pane fade show active" id="submit-tab" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fa fa-paper-plane"></i> 提交聊天历史
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="submitForm">
+                            <div class="mb-3">
+                                <label for="submitUserId" class="form-label">用户ID</label>
+                                <input type="text" class="form-control" id="submitUserId" placeholder="请输入用户ID" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="submitAppName" class="form-label">应用名称</label>
+                                <input type="text" class="form-control" id="submitAppName" placeholder="请输入应用名称" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">聊天消息列表</label>
+                                <div id="messagesList">
+                                    <!-- 动态添加的聊天消息 -->
+                                    <div class="message-item mb-3 border p-3 rounded">
+                                        <div class="row g-2">
+                                            <div class="col-md-2">
+                                                <select class="form-select" name="role">
+                                                    <option value="user">用户</option>
+                                                    <option value="assistant">助手</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <textarea class="form-control" name="content" rows="2" placeholder="请输入消息内容" required></textarea>
+                                            </div>
+                                            <div class="col-md-1 align-self-end">
+                                                <button type="button" class="btn btn-danger btn-sm remove-message">
+                                                    <i class="fa fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-secondary mt-2" id="addMessage">
+                                    <i class="fa fa-plus"></i> 添加消息
+                                </button>
+                            </div>
+                            
+                            <div class="d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-send"></i> 提交
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 记忆查询标签页 -->
+            <div class="tab-pane fade" id="query-tab" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fa fa-search"></i> 查询记忆
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="queryForm">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="queryUserId" class="form-label">用户ID</label>
+                                    <input type="text" class="form-control" id="queryUserId" placeholder="请输入用户ID" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="queryAppName" class="form-label">应用名称</label>
+                                    <input type="text" class="form-control" id="queryAppName" placeholder="请输入应用名称" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="queryTopK" class="form-label">返回数量</label>
+                                    <input type="number" class="form-control" id="queryTopK" min="1" max="20" value="5" required>
+                                </div>
+                            </div>
+                            <div class="mb-3 mt-3">
+                                <label for="queryContent" class="form-label">查询内容</label>
+                                <textarea class="form-control" id="queryContent" rows="3" placeholder="请输入查询内容" required></textarea>
+                            </div>
+                            
+                            <div class="d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-search"></i> 查询
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <!-- 查询结果 -->
+                        <div id="queryResults" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 记忆管理标签页 -->
+            <div class="tab-pane fade" id="manage-tab" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fa fa-cog"></i> 管理记忆
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-5">
+                                <label for="manageUserId" class="form-label">用户ID</label>
+                                <input type="text" class="form-control" id="manageUserId" placeholder="请输入用户ID" required>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="manageAppName" class="form-label">应用名称</label>
+                                <input type="text" class="form-control" id="manageAppName" placeholder="请输入应用名称" required>
+                            </div>
+                            <div class="col-md-2 align-self-end">
+                                <button type="button" class="btn btn-primary" id="loadMemories">
+                                    <i class="fa fa-refresh"></i> 加载记忆
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 记忆列表 -->
+                        <div id="memoriesList" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 配置标签页 -->
+            <div class="tab-pane fade" id="config-tab" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fa fa-wrench"></i> 配置管理
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-5">
+                                <label for="configUserId" class="form-label">用户ID</label>
+                                <input type="text" class="form-control" id="configUserId" placeholder="请输入用户ID" required>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="configAppName" class="form-label">应用名称</label>
+                                <input type="text" class="form-control" id="configAppName" placeholder="请输入应用名称" required>
+                            </div>
+                            <div class="col-md-2 align-self-end">
+                                <button type="button" class="btn btn-primary" id="loadConfig">
+                                    <i class="fa fa-refresh"></i> 加载配置
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <form id="configForm">
+                            <div class="mb-3">
+                                <label for="extractionPrompt" class="form-label">要素抽取提示词</label>
+                                <textarea class="form-control" id="extractionPrompt" rows="3"></textarea>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="mergeThreshold" class="form-label">合并阈值</label>
+                                    <input type="number" class="form-control" id="mergeThreshold" min="0" max="1" step="0.05">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="expiryStrategy" class="form-label">过期策略</label>
+                                    <select class="form-select" id="expiryStrategy">
+                                        <option value="never">永不过期</option>
+                                        <option value="last_access">根据最后访问时间</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="expiryDays" class="form-label">过期天数</label>
+                                    <input type="number" class="form-control" id="expiryDays" min="1">
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-end mt-4">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-save"></i> 保存配置
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-light py-3 text-center">
+        <div class="container">
+            <p class="mb-0">基于大模型的轻量化记忆系统 &copy; 2025</p>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 自定义JS -->
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/submit.js"></script>
+    <script src="/static/js/query.js"></script>
+    <script src="/static/js/manage.js"></script>
+    <script src="/static/js/config.js"></script>
+</body>
+</html>
