@@ -22,6 +22,8 @@
 - ✅ 自动生成API文档
 - ✅ 定时任务管理
 - ✅ 多租户支持（基于user_id和app_name）
+- ✅ 完整的前端页面
+- ✅ 响应式设计，适配不同设备
 
 ## 技术栈
 
@@ -33,13 +35,14 @@
 - **ORM**: SQLAlchemy 2.0.23
 - **Schema验证**: Pydantic 2.4.2
 - **定时任务**: Schedule 1.2.0
+- **前端框架**: Bootstrap 5 + jQuery
 
-## 安装步骤
+## 快速开始
 
 ### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/intohole/beeMemory.git
 cd beeMemory
 ```
 
@@ -91,24 +94,115 @@ MERGE_INTERVAL_MINUTES=60
 CLEANUP_INTERVAL_MINUTES=1440
 ```
 
-## 快速开始
-
-### 1. 启动Chroma服务（如果使用远程Chroma）
-
-```bash
-# 参考Chroma文档启动服务
-```
-
-### 2. 启动应用
+### 5. 启动应用
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-### 3. 访问API文档
+### 6. 访问应用
 
-- Swagger文档: http://localhost:8000/docs
-- ReDoc文档: http://localhost:8000/redoc
+- **前端页面**: http://127.0.0.1:8000
+- **API文档**: http://127.0.0.1:8000/docs
+- **ReDoc文档**: http://127.0.0.1:8000/redoc
+
+## 项目结构
+
+```
+app/
+├── api/                    # API路由
+│   ├── __init__.py
+│   └── memory.py           # 记忆相关接口
+├── core/                   # 核心配置
+│   ├── __init__.py
+│   ├── config.py           # 全局配置
+│   └── task_scheduler.py   # 定时任务调度
+├── crud/                   # 数据库操作（预留）
+│   └── __init__.py
+├── db/                     # 数据库相关
+│   ├── __init__.py
+│   ├── base.py             # 数据库基类
+│   └── session.py          # 数据库会话
+├── models/                 # 数据模型
+│   ├── __init__.py
+│   └── memory.py           # 记忆相关模型
+├── schemas/                # Schema定义
+│   ├── __init__.py
+│   └── memory.py           # 记忆相关Schema
+├── services/               # 业务逻辑服务
+│   ├── __init__.py
+│   ├── embedding/          # Embedding服务
+│   │   ├── __init__.py
+│   │   ├── base.py         # Embedding基类
+│   │   └── openai.py       # OpenAI Embedding服务
+│   ├── llm/                # 大模型服务
+│   │   ├── __init__.py
+│   │   ├── base.py         # LLM基类
+│   │   └── openai.py       # OpenAI LLM服务
+│   ├── memory/             # 记忆管理
+│   │   ├── __init__.py
+│   │   ├── manager.py      # 记忆管理器
+│   │   ├── merger.py       # 重复合并
+│   │   └── cleanup.py      # 记忆清理
+│   └── chroma/             # Chroma客户端
+│       ├── __init__.py
+│       └── client.py       # Chroma客户端
+├── static/                 # 前端静态文件
+│   ├── index.html          # 主页面
+│   ├── css/                # 样式文件
+│   │   └── style.css       # 自定义样式
+│   └── js/                 # 前端逻辑
+│       ├── main.js         # 主逻辑
+│       ├── submit.js       # 聊天历史提交
+│       ├── query.js        # 记忆查询
+│       ├── manage.js       # 记忆管理
+│       └── config.js       # 配置管理
+├── utils/                  # 工具函数
+│   └── __init__.py
+└── main.py                 # 应用入口
+requirements.txt            # 依赖文件
+README.md                   # 说明文档
+.gitignore                  # Git忽略文件
+```
+
+## 核心功能说明
+
+### 1. 记忆生成流程
+
+1. 接收聊天历史请求
+2. 存储聊天历史到数据库
+3. 调用大模型抽取关键要素
+4. 生成Embedding向量
+5. 存储记忆到数据库和Chroma
+6. 触发重复记忆合并检查
+
+### 2. 记忆查询流程
+
+1. 接收查询请求
+2. 生成查询Embedding
+3. 调用Chroma查询相似记忆
+4. 更新记忆最后访问时间
+5. 返回查询结果
+
+### 3. 重复记忆合并
+
+- 定时任务（默认每60分钟）
+- 按user_id和app_name分组
+- 计算记忆间相似度
+- 合并相似度超过阈值的记忆
+- 软删除重复记忆
+
+### 4. 记忆清理策略
+
+#### 过期策略
+- **never**: 永不过期
+- **last_access**: 根据最后访问时间过期
+
+#### 清理流程
+- 定时任务（默认每1440分钟）
+- 清理已过期的记忆
+- 清理长期未访问的记忆
+- 同时清理数据库和Chroma数据
 
 ## API接口
 
@@ -182,94 +276,35 @@ PUT /api/memory/config?user_id=user123&app_name=myapp
 }
 ```
 
-## 项目结构
+## 前端功能
 
-```
-app/
-├── api/                    # API路由
-│   ├── __init__.py
-│   └── memory.py           # 记忆相关接口
-├── core/                   # 核心配置
-│   ├── __init__.py
-│   ├── config.py           # 全局配置
-│   └── task_scheduler.py   # 定时任务调度
-├── crud/                   # 数据库操作（预留）
-│   └── __init__.py
-├── db/                     # 数据库相关
-│   ├── __init__.py
-│   ├── base.py             # 数据库基类
-│   └── session.py          # 数据库会话
-├── models/                 # 数据模型
-│   ├── __init__.py
-│   └── memory.py           # 记忆相关模型
-├── schemas/                # Schema定义
-│   ├── __init__.py
-│   └── memory.py           # 记忆相关Schema
-├── services/               # 业务逻辑服务
-│   ├── __init__.py
-│   ├── embedding/          # Embedding服务
-│   │   ├── __init__.py
-│   │   ├── base.py         # Embedding基类
-│   │   └── openai.py       # OpenAI Embedding服务
-│   ├── llm/                # 大模型服务
-│   │   ├── __init__.py
-│   │   ├── base.py         # LLM基类
-│   │   └── openai.py       # OpenAI LLM服务
-│   ├── memory/             # 记忆管理
-│   │   ├── __init__.py
-│   │   ├── manager.py      # 记忆管理器
-│   │   ├── merger.py       # 重复合并
-│   │   └── cleanup.py      # 记忆清理
-│   └── chroma/             # Chroma客户端
-│       ├── __init__.py
-│       └── client.py       # Chroma客户端
-├── utils/                  # 工具函数
-│   └── __init__.py
-└── main.py                 # 应用入口
-requirements.txt            # 依赖文件
-README.md                   # 说明文档
-```
+### 1. 聊天历史提交
+- 支持动态添加/删除聊天消息
+- 表单验证
+- 提交结果反馈
 
-## 核心功能说明
+### 2. 记忆查询
+- 支持设置查询参数
+- 显示查询结果，包括相似度
+- 结果按相似度排序
 
-### 1. 记忆生成流程
+### 3. 记忆管理
+- 直接输入记忆ID进行删除
+- 删除确认提示
 
-1. 接收聊天历史请求
-2. 存储聊天历史到数据库
-3. 调用大模型抽取关键要素
-4. 生成Embedding向量
-5. 存储记忆到数据库和Chroma
-6. 触发重复记忆合并检查
-
-### 2. 记忆查询流程
-
-1. 接收查询请求
-2. 生成查询Embedding
-3. 调用Chroma查询相似记忆
-4. 更新记忆最后访问时间
-5. 返回查询结果
-
-### 3. 重复记忆合并
-
-- 定时任务（默认每60分钟）
-- 按user_id和app_name分组
-- 计算记忆间相似度
-- 合并相似度超过阈值的记忆
-- 软删除重复记忆
-
-### 4. 记忆清理策略
-
-#### 过期策略
-- **never**: 永不过期
-- **last_access**: 根据最后访问时间过期
-
-#### 清理流程
-- 定时任务（默认每1440分钟）
-- 清理已过期的记忆
-- 清理长期未访问的记忆
-- 同时清理数据库和Chroma数据
+### 4. 配置管理
+- 加载当前配置
+- 编辑配置参数
+- 保存配置
 
 ## 开发说明
+
+### 代码风格
+
+- 遵循PEP 8规范
+- 使用Type hints
+- 完整的文档字符串
+- 模块化设计
 
 ### 运行测试
 
@@ -277,29 +312,25 @@ README.md                   # 说明文档
 # 目前未实现测试，后续可添加
 ```
 
-### 代码风格
+### 部署建议
 
-- 遵循PEP 8规范
-- 使用Type hints
-- 模块化设计
-- 完整的文档字符串
+#### 开发环境
 
-## 部署说明
+```bash
+uvicorn app.main:app --reload
+```
 
-### 生产环境部署
+#### 生产环境
 
 ```bash
 # 使用gunicorn部署
 pip install gunicorn
-
-# 启动服务
 gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000
 ```
 
-### Docker部署
+#### Docker部署
 
 ```dockerfile
-# Dockerfile示例
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -314,10 +345,6 @@ EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-## 许可证
-
-MIT License
-
 ## 扩展建议
 
 1. **支持更多大模型**: 可扩展支持Anthropic Claude、Google Gemini等
@@ -326,7 +353,31 @@ MIT License
 4. **添加监控**: 监控API调用情况、记忆使用情况等
 5. **支持多模态记忆**: 支持图片、语音等多模态内容
 6. **添加权限管理**: 添加API密钥验证、用户认证等
+7. **支持分布式部署**: 后续可扩展到分布式部署
+8. **添加数据可视化**: 如记忆数量统计、使用频率等
+
+## 许可证
+
+MIT License
 
 ## 联系方式
 
 如有问题或建议，欢迎提交Issue或Pull Request。
+
+## 更新日志
+
+### v1.0.0 (2025-01-01)
+- 初始版本发布
+- 实现了聊天历史提交与记忆生成
+- 实现了基于相似度的记忆查询
+- 实现了记忆的增删改查
+- 实现了自动要素抽取
+- 实现了重复记忆自动合并
+- 实现了记忆过期清理策略
+- 实现了完整的前端页面
+
+---
+
+**项目地址**: https://github.com/intohole/beeMemory
+**API文档**: http://127.0.0.1:8000/docs
+**前端页面**: http://127.0.0.1:8000
