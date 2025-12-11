@@ -5,23 +5,7 @@ from app.db.base import Base
 from typing import Optional, List
 
 
-class BusinessTemplate(Base):
-    """业务模板表，存储不同业务场景的抽取模板"""
-    __tablename__ = "business_templates"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    template_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    app_name: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
-    extraction_prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    priority_fields: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # 复合唯一约束
-    __table_args__ = (
-        UniqueConstraint('app_name', 'template_name', name='_app_template_uc'),
-    )
+
 
 
 class MemoryPriority(Base):
@@ -154,24 +138,4 @@ class ChatHistory(Base):
     timestamp: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class MemoryConfig(Base):
-    """记忆配置表"""
-    __tablename__ = "memory_configs"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
-    app_name: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
-    extraction_prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    merge_threshold: Mapped[float] = mapped_column(Float, default=0.8, nullable=False)
-    expiry_strategy: Mapped[str] = mapped_column(String(50), default="last_access", nullable=False)
-    expiry_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
-    use_template: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    default_template_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("business_templates.id"), nullable=True)
-    
-    # 复合唯一约束
-    __table_args__ = (
-        UniqueConstraint('user_id', 'app_name', name='_user_app_uc'),
-    )
-    
-    # 关系
-    default_template = relationship("BusinessTemplate")
+

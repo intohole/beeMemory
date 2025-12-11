@@ -5,7 +5,7 @@ from sqlalchemy import and_, func
 import json
 import numpy as np
 
-from app.models import UserMemory, ChatHistory, MemoryConfig, MemoryEmbedding, BusinessTemplate, AppConfig, UserAppConfig
+from app.models import UserMemory, ChatHistory, MemoryEmbedding, AppConfig, UserAppConfig
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -25,32 +25,24 @@ class MemoryManager:
         self.llm_service = LLMServiceFactory.get_llm_service()
         self.chroma_client = ChromaClient()
     
-    def get_or_create_config(self, user_id: str, app_name: str) -> MemoryConfig:
-        """获取或创建记忆配置
+    def get_or_create_config(self, user_id: str, app_name: str) -> AppConfig:
+        """获取或创建应用配置
         
         Args:
             user_id: 用户ID
             app_name: 应用名称
             
         Returns:
-            记忆配置对象
+            应用配置对象
         """
-        config = self.db.query(MemoryConfig).filter(
-            and_(
-                MemoryConfig.user_id == user_id,
-                MemoryConfig.app_name == app_name
-            )
+        config = self.db.query(AppConfig).filter(
+            AppConfig.app_name == app_name
         ).first()
         
         if not config:
-            # 使用新的配置结构
-            config = MemoryConfig(
-                user_id=user_id,
-                app_name=app_name,
-                extraction_prompt=settings.memory.default_extraction_prompt,
-                merge_threshold=settings.memory.default_merge_threshold,
-                expiry_strategy=settings.memory.default_expiry_strategy,
-                expiry_days=settings.memory.default_expiry_days
+            # 如果应用配置不存在，创建默认配置
+            config = AppConfig(
+                app_name=app_name
             )
             self.db.add(config)
             self.db.commit()

@@ -2,100 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.db.session import get_db
-from app.models import MemoryConfig
 from app.schemas.memory import (
-    MemoryConfigCreate,
-    MemoryConfigUpdate,
-    MemoryConfigResponse,
     APIResponse
 )
 from app.core.config import settings
 from app.services.memory import MemoryManager
 
 router = APIRouter()
-
-
-@router.get("/config", response_model=APIResponse)
-async def get_memory_config(
-    user_id: str,
-    app_name: str,
-    db: Session = Depends(get_db)
-):
-    """获取记忆配置"""
-    try:
-        memory_manager = MemoryManager(db)
-        
-        # 获取或创建配置
-        config = memory_manager.get_or_create_config(user_id, app_name)
-        
-        # 转换为Schema格式
-        config_response = MemoryConfigResponse.model_validate(config)
-        
-        return APIResponse(
-            success=True,
-            message="Config retrieved successfully",
-            data={"config": config_response}
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get memory config: {str(e)}"
-        )
-
-
-@router.put("/config", response_model=APIResponse)
-async def update_memory_config(
-    user_id: str,
-    app_name: str,
-    config_update: MemoryConfigUpdate,
-    db: Session = Depends(get_db)
-):
-    """更新记忆配置"""
-    try:
-        # 获取配置
-        config = db.query(MemoryConfig).filter(
-            MemoryConfig.user_id == user_id,
-            MemoryConfig.app_name == app_name
-        ).first()
-        
-        if not config:
-            # 如果配置不存在，创建新配置
-            config = MemoryConfig(
-                user_id=user_id,
-                app_name=app_name,
-                extraction_prompt=config_update.extraction_prompt or settings.memory.default_extraction_prompt,
-                merge_threshold=config_update.merge_threshold or settings.memory.default_merge_threshold,
-                expiry_strategy=config_update.expiry_strategy or settings.memory.default_expiry_strategy,
-                expiry_days=config_update.expiry_days or settings.memory.default_expiry_days
-            )
-            db.add(config)
-        else:
-            # 更新配置
-            if config_update.extraction_prompt is not None:
-                config.extraction_prompt = config_update.extraction_prompt
-            if config_update.merge_threshold is not None:
-                config.merge_threshold = config_update.merge_threshold
-            if config_update.expiry_strategy is not None:
-                config.expiry_strategy = config_update.expiry_strategy
-            if config_update.expiry_days is not None:
-                config.expiry_days = config_update.expiry_days
-        
-        db.commit()
-        db.refresh(config)
-        
-        # 转换为Schema格式
-        config_response = MemoryConfigResponse.model_validate(config)
-        
-        return APIResponse(
-            success=True,
-            message="Config updated successfully",
-            data={"config": config_response}
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update memory config: {str(e)}"
-        )
 
 
 @router.get("/app/config", response_model=APIResponse)
