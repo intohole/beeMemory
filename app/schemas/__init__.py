@@ -6,9 +6,6 @@ from app.schemas.memory import (
     MemoryResponse,
     MemoryQuery,
     MemoryQueryResult,
-    MemoryConfigCreate,
-    MemoryConfigUpdate,
-    MemoryConfigResponse,
     APIResponse
 )
 
@@ -20,8 +17,5 @@ __all__ = [
     "MemoryResponse",
     "MemoryQuery",
     "MemoryQueryResult",
-    "MemoryConfigCreate",
-    "MemoryConfigUpdate",
-    "MemoryConfigResponse",
     "APIResponse"
 ]
