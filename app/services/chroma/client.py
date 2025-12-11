@@ -2,49 +2,78 @@ from typing import List, Dict, Any, Optional
 import chromadb
 from chromadb.config import Settings
 from app.core.config import settings
+from app.core.logging import get_logger
+import os
+
+logger = get_logger(__name__)
 
 
 class ChromaClient:
     """Chroma客户端服务"""
     
     def __init__(self, 
-                 host: Optional[str] = None, 
-                 port: Optional[int] = None,
                  collection_name: Optional[str] = None):
         """初始化Chroma客户端
         
         Args:
-            host: Chroma服务器地址
-            port: Chroma服务器端口
             collection_name: 集合名称
         """
-        self.host = host or settings.CHROMA_HOST
-        self.port = port or settings.CHROMA_PORT
-        self.collection_name = collection_name or settings.CHROMA_COLLECTION_NAME
+        # 使用新的配置结构
+        self.config = settings.chroma
+        self.collection_name = collection_name or self.config.collection_name
         
-        # 初始化Chroma客户端
-        self.client = chromadb.HttpClient(
-            host=self.host,
-            port=self.port,
-            settings=Settings(
-                allow_reset=True,
-                anonymized_telemetry=False
+        logger.info(f"Initializing ChromaClient...")
+        logger.info(f"Collection name: {self.collection_name}")
+        logger.info(f"Chroma config: {self.config.model_dump()}")
+        
+        if self.config.use_persistent_client:
+            # 使用本地持久化客户端
+            logger.info("Using Chroma PersistentClient (local storage)")
+            logger.info("Note: When using PersistentClient, host and port settings are ignored")
+            
+            # 创建chroma数据目录
+            chroma_data_path = self.config.persist_directory or os.path.join(os.getcwd(), "chroma_data")
+            os.makedirs(chroma_data_path, exist_ok=True)
+            
+            # 初始化Chroma客户端（本地文件存储）
+            self.client = chromadb.PersistentClient(
+                path=chroma_data_path,
+                settings=Settings(
+                    allow_reset=True,
+                    anonymized_telemetry=False
+                )
             )
-        )
+        else:
+            # 使用远程客户端
+            logger.info(f"Using Chroma HttpClient (remote: {self.config.host}:{self.config.port})")
+            logger.info("Note: When using HttpClient, persist_directory setting is ignored")
+            
+            # 初始化Chroma远程客户端
+            self.client = chromadb.HttpClient(
+                host=self.config.host,
+                port=self.config.port,
+                settings=Settings(
+                    allow_reset=True,
+                    anonymized_telemetry=False
+                )
+            )
         
         # 获取或创建集合
+        logger.info(f"Getting or creating collection: {self.collection_name}")
         self.collection = self.client.get_or_create_collection(
             name=self.collection_name,
             metadata={"hnsw:space": "cosine"}  # 使用余弦相似度
         )
+        logger.info(f"ChromaClient initialized successfully")
     
     def add_embedding(self, 
                       embedding: List[float], 
                       document: str, 
                       memory_id: int,
                       user_id: str,
-                      app_name: str) -> None:
-        """添加单个Embedding向量
+                      app_name: str, 
+                      similarity_threshold: float = 0.95) -> None:
+        """添加单个Embedding向量，支持相似Embedding共享
         
         Args:
             embedding: Embedding向量
@@ -52,7 +81,51 @@ class ChromaClient:
             memory_id: 记忆ID
             user_id: 用户ID
             app_name: 应用名称
+            similarity_threshold: 相似Embedding的阈值，超过此阈值则共享
         """
+        # 先尝试查找相似的Embedding
+        similar_results = self.collection.query(
+            query_embeddings=[embedding],
+            n_results=1,
+            where={
+                "$and": [
+                    {"user_id": user_id},
+                    {"app_name": app_name}
+                ]
+            }
+        )
+        
+        # 检查是否有相似度超过阈值的Embedding
+        try:
+            if similar_results and similar_results["ids"] and len(similar_results["ids"]) > 0 and len(similar_results["ids"][0]) > 0:
+                similar_id = similar_results["ids"][0][0]
+                similarity = 1 - similar_results["distances"][0][0]  # 转换为相似度
+                
+                if similarity >= similarity_threshold:
+                    # 找到了相似的Embedding，复用它
+                    # 记录Embedding共享关系
+                    logger.info(f"Sharing embedding {similar_id} for memory {memory_id} with similarity {similarity}")
+                    # 这里可以添加一个共享关系的记录，例如存储到数据库
+                    # 目前我们直接添加新的文档引用，共享相同的Embedding
+                    self.collection.add(
+                        embeddings=[embedding],  # 虽然共享，但为了简单，还是添加新的Embedding
+                        documents=[document],
+                        ids=[f"memory_{memory_id}"],
+                        metadatas=[{
+                            "memory_id": memory_id,
+                            "user_id": user_id,
+                            "app_name": app_name,
+                            "shared_embedding": True,
+                            "similarity": similarity,
+                            "original_embedding_id": similar_id
+                        }]
+                    )
+                    return
+        except (IndexError, KeyError) as e:
+            # 如果查询结果处理失败，跳过相似检查，直接添加新的Embedding
+            logger.warning(f"Failed to check similar embeddings: {e}")
+        
+        # 如果没有找到相似的Embedding，添加新的
         self.collection.add(
             embeddings=[embedding],
             documents=[document],
@@ -60,7 +133,8 @@ class ChromaClient:
             metadatas=[{
                 "memory_id": memory_id,
                 "user_id": user_id,
-                "app_name": app_name
+                "app_name": app_name,
+                "shared_embedding": False
             }]
         )
     
@@ -106,12 +180,15 @@ class ChromaClient:
         Returns:
             查询结果列表，每个结果包含memory_id、similarity和document
         """
+        # 使用$and操作符组合多个条件
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=top_k,
             where={
-                "user_id": user_id,
-                "app_name": app_name
+                "$and": [
+                    {"user_id": user_id},
+                    {"app_name": app_name}
+                ]
             }
         )
         

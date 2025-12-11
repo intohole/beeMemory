@@ -5,7 +5,10 @@ from sqlalchemy import and_, func
 import json
 import numpy as np
 
-from app.models import UserMemory, ChatHistory, MemoryConfig, MemoryEmbedding
+from app.models import UserMemory, ChatHistory, MemoryConfig, MemoryEmbedding, BusinessTemplate, AppConfig, UserAppConfig
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 from app.schemas.memory import MemoryCreate, MemoryResponse, ChatMessage
 from app.services.embedding import EmbeddingServiceFactory
 from app.services.llm import LLMServiceFactory
@@ -40,13 +43,14 @@ class MemoryManager:
         ).first()
         
         if not config:
+            # 使用新的配置结构
             config = MemoryConfig(
                 user_id=user_id,
                 app_name=app_name,
-                extraction_prompt=settings.DEFAULT_EXTRACTION_PROMPT,
-                merge_threshold=settings.DEFAULT_MERGE_THRESHOLD,
-                expiry_strategy=settings.DEFAULT_EXPIRY_STRATEGY,
-                expiry_days=settings.DEFAULT_EXPIRY_DAYS
+                extraction_prompt=settings.memory.default_extraction_prompt,
+                merge_threshold=settings.memory.default_merge_threshold,
+                expiry_strategy=settings.memory.default_expiry_strategy,
+                expiry_days=settings.memory.default_expiry_days
             )
             self.db.add(config)
             self.db.commit()
@@ -54,18 +58,121 @@ class MemoryManager:
         
         return config
     
-    def store_chat_history(self, user_id: str, app_name: str, messages: List[ChatMessage]) -> None:
+    def get_or_create_app_config(self, app_name: str) -> AppConfig:
+        """获取或创建应用配置
+        
+        Args:
+            app_name: 应用名称
+            
+        Returns:
+            应用配置对象
+        """
+        config = self.db.query(AppConfig).filter(
+            AppConfig.app_name == app_name
+        ).first()
+        
+        if not config:
+            # 创建默认应用配置
+            config = AppConfig(
+                app_name=app_name
+            )
+            self.db.add(config)
+            self.db.commit()
+            self.db.refresh(config)
+        
+        return config
+    
+    def get_user_app_config(self, user_id: str, app_name: str) -> Optional[UserAppConfig]:
+        """获取用户应用配置
+        
+        Args:
+            user_id: 用户ID
+            app_name: 应用名称
+            
+        Returns:
+            用户应用配置对象，不存在则返回None
+        """
+        return self.db.query(UserAppConfig).filter(
+            and_(
+                UserAppConfig.user_id == user_id,
+                UserAppConfig.app_name == app_name
+            )
+        ).first()
+    
+    def create_or_update_user_app_config(self, user_id: str, app_name: str, use_default: bool = True, custom_config: dict = None) -> UserAppConfig:
+        """创建或更新用户应用配置
+        
+        Args:
+            user_id: 用户ID
+            app_name: 应用名称
+            use_default: 是否使用默认配置
+            custom_config: 自定义配置
+            
+        Returns:
+            更新后的用户应用配置对象
+        """
+        config = self.get_user_app_config(user_id, app_name)
+        
+        if config:
+            # 更新现有配置
+            config.use_default = use_default
+            if custom_config:
+                config.custom_config = custom_config
+        else:
+            # 创建新配置
+            config = UserAppConfig(
+                user_id=user_id,
+                app_name=app_name,
+                use_default=use_default,
+                custom_config=custom_config
+            )
+            self.db.add(config)
+        
+        self.db.commit()
+        self.db.refresh(config)
+        return config
+    
+    def update_app_config(self, app_name: str, **kwargs) -> AppConfig:
+        """更新应用配置
+        
+        Args:
+            app_name: 应用名称
+            **kwargs: 配置参数
+            
+        Returns:
+            更新后的应用配置对象
+        """
+        config = self.get_or_create_app_config(app_name)
+        
+        # 更新配置参数
+        for key, value in kwargs.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        
+        self.db.commit()
+        self.db.refresh(config)
+        return config
+    
+    def store_chat_history(self, user_id: str, app_name: str, messages: List[ChatMessage], session_id: str = None) -> None:
         """存储聊天历史
         
         Args:
             user_id: 用户ID
             app_name: 应用名称
             messages: 聊天消息列表
+            session_id: 会话ID，用于关联同一会话的消息
         """
+        import uuid
+        
+        # 如果没有提供session_id，生成一个新的
+        if not session_id:
+            session_id = str(uuid.uuid4())
+        
         for message in messages:
             chat_history = ChatHistory(
                 user_id=user_id,
                 app_name=app_name,
+                session_id=session_id,
                 role=message.role,
                 content=message.content,
                 timestamp=message.timestamp or datetime.utcnow()
@@ -73,6 +180,34 @@ class MemoryManager:
             self.db.add(chat_history)
         
         self.db.commit()
+        return session_id
+    
+    def summarize_dialogue(self, messages: List[ChatMessage]) -> str:
+        """对对话进行总结
+        
+        Args:
+            messages: 聊天消息列表
+            
+        Returns:
+            对话总结
+        """
+        if not messages:
+            return ""
+        
+        # 构建对话上下文
+        dialogue = "\n".join([f"{msg.role}: {msg.content}" for msg in messages])
+        
+        # 构建统一的总结和提取prompt
+        prompt = f"请对以下对话进行处理，完成以下任务：\n\n1. 总结对话的核心内容，提取关键信息\n2. 提取对话中的重要要素\n3. 确保结果简洁明了\n\n对话内容：\n{dialogue}\n\n请直接返回总结结果，不要添加任何额外内容："
+        
+        # 调用LLM进行总结
+        try:
+            summary = self.llm_service.generate_text(prompt)
+            return summary.strip()
+        except Exception as e:
+            logger.error(f"Failed to summarize dialogue: {e}")
+            # 如果总结失败，返回简洁的对话拼接
+            return dialogue
     
     def generate_memory_content(self, messages: List[ChatMessage]) -> str:
         """生成记忆内容
@@ -83,8 +218,68 @@ class MemoryManager:
         Returns:
             生成的记忆内容
         """
-        memory_content = "\n".join([f"{msg.role}: {msg.content}" for msg in messages])
-        return memory_content
+        # 对对话进行总结，生成记忆内容
+        return self.summarize_dialogue(messages)
+    
+    def should_process_content(self, user_id: str, app_name: str, content: str) -> bool:
+        """判断内容是否需要处理为记忆
+        
+        Args:
+            user_id: 用户ID
+            app_name: 应用名称
+            content: 要判断的内容
+            
+        Returns:
+            是否需要处理
+        """
+        # 过滤空内容
+        if not content or content.strip() == "":
+            return False
+        
+        # 过滤过短的内容（少于10个字符）
+        if len(content.strip()) < 10:
+            return False
+        
+        # 过滤常见的无意义内容
+        trivial_patterns = ["你好", "早上好", "晚上好", "再见", "谢谢", "不客气", "好的", "是的", "不是", "嗯", "哦", "啊", "哦", "好", "行", "可以"]
+        if content.strip() in trivial_patterns:
+            return False
+        
+        return True
+    
+    def get_similar_memory(self, user_id: str, app_name: str, content: str, threshold: float = 0.85) -> Optional[UserMemory]:
+        """查找相似的记忆
+        
+        Args:
+            user_id: 用户ID
+            app_name: 应用名称
+            content: 要比较的内容
+            threshold: 相似度阈值
+            
+        Returns:
+            相似的记忆对象，没有则返回None
+        """
+        try:
+            # 生成内容的Embedding（使用缓存）
+            content_embedding = self.embedding_service.get_cached_embedding(content)
+            
+            # 查询相似记忆
+            chroma_results = self.chroma_client.query_embeddings(
+                query_embedding=content_embedding,
+                user_id=user_id,
+                app_name=app_name,
+                top_k=1
+            )
+            
+            if chroma_results and len(chroma_results) > 0:
+                similarity = 1 - chroma_results[0]["similarity"]
+                if similarity >= threshold:
+                    return self.get_memory(chroma_results[0]["memory_id"])
+        except Exception as e:
+            # 如果查询失败，返回None
+            return None
+        
+        return None
     
     def extract_elements(self, user_id: str, app_name: str, memory_content: str) -> Dict[str, Any]:
         """抽取记忆要素
@@ -97,19 +292,46 @@ class MemoryManager:
         Returns:
             抽取的要素
         """
-        # 获取记忆配置
-        config = self.get_or_create_config(user_id, app_name)
+        import hashlib
+        from app.utils.cache import cache
         
-        # 构建提示词
-        prompt = f"{config.extraction_prompt}\n\n{memory_content}\n\n请以JSON格式返回抽取的要素，确保JSON格式正确，不要包含其他内容。"
+        # 检查内容是否需要提取要素
+        if len(memory_content.strip()) < 10:
+            return {}
         
-        # 调用大模型抽取要素
+        # 获取应用配置
+        app_config = self.get_or_create_app_config(app_name)
+        
+        # 生成缓存键
+        cache_key = f"llm_extract:{app_name}:{hashlib.md5((memory_content + str(app_config.extraction_fields)).encode('utf-8')).hexdigest()}"
+        
+        # 尝试从缓存获取
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+        
+        # 构建动态的抽取prompt，使用应用配置中的extraction_fields
+        fields_desc = "\n".join([f"{key}: {desc}" for key, desc in app_config.extraction_fields.items()])
+        
+        # 构建统一的prompt
+        prompt = f"{app_config.extraction_template}\n\n记忆内容：\n{memory_content}\n\n请提取以下要素：\n{fields_desc}\n\n请严格按照以下要求返回：\n1. 使用JSON格式\n2. 键名必须与上述要素列表完全一致\n3. 每个键对应的值必须准确反映记忆中的内容\n4. 如果某个要素不存在，可省略该字段\n5. 不要添加任何额外内容\n\n请直接返回JSON结果："
+        
+        # 调用LLM进行要素提取
+        response = self.llm_service.generate_text(prompt, app_name=app_name)
+        
+        # 解析结果
         try:
-            response = self.llm_service.generate_text(prompt)
             elements = json.loads(response)
+            
+            # 缓存结果
+            cache.set(cache_key, elements, expiry=settings.memory.llm_cache_ttl)
+            
             return elements
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse extraction response: {e}. Response: {response}")
+            return {}
         except Exception as e:
-            # 如果抽取失败，返回空字典
+            logger.error(f"Failed to extract elements: {e}")
             return {}
     
     def calculate_expiry_time(self, user_id: str, app_name: str) -> Optional[datetime]:
@@ -130,22 +352,103 @@ class MemoryManager:
         else:
             return datetime.utcnow() + timedelta(days=config.expiry_days)
     
-    def create_memory(self, user_id: str, app_name: str, memory_content: str) -> UserMemory:
+    def create_memory(self, user_id: str, app_name: str, memory_content: str, is_summary: bool = False) -> UserMemory:
         """创建记忆
         
         Args:
             user_id: 用户ID
             app_name: 应用名称
             memory_content: 记忆内容
+            is_summary: 是否是对话总结结果
             
         Returns:
             创建的记忆对象
         """
+        # 如果不是总结结果，对内容进行总结
+        if not is_summary:
+            # 先对内容进行总结
+            summary = self.summarize_dialogue([ChatMessage(role="user", content=memory_content)])
+            # 使用总结作为记忆内容
+            memory_content = summary
+        
+        # 检查内容是否需要处理
+        if not self.should_process_content(user_id, app_name, memory_content):
+            # 如果内容不需要处理，创建一个低优先级的记忆
+            expiry_time = self.calculate_expiry_time(user_id, app_name)
+            memory = UserMemory(
+                user_id=user_id,
+                app_name=app_name,
+                memory_content=memory_content,
+                extracted_elements={},
+                memory_priority=1,  # 低优先级
+                memory_tags=["trivial"],
+                expiry_time=expiry_time,
+                last_accessed_at=datetime.utcnow()
+            )
+            self.db.add(memory)
+            self.db.commit()
+            self.db.refresh(memory)
+            return memory
+        
+        # 查找相似记忆，如果存在则更新
+        similar_memory = self.get_similar_memory(user_id, app_name, memory_content)
+        if similar_memory:
+            # 更新相似记忆，实现增量抽取
+            updated_content = f"{similar_memory.memory_content}\n\n---\n\n{memory_content}"
+            
+            # 重新抽取要素
+            updated_elements = self.extract_elements(user_id, app_name, updated_content)
+            
+            # 合并要素
+            merged_elements = similar_memory.extracted_elements or {}
+            merged_elements.update(updated_elements)
+            
+            # 更新记忆
+            similar_memory.memory_content = updated_content
+            similar_memory.extracted_elements = merged_elements
+            similar_memory.last_accessed_at = datetime.utcnow()
+            similar_memory.updated_at = datetime.utcnow()
+            
+            self.db.commit()
+            self.db.refresh(similar_memory)
+            
+            # 更新Embedding
+            updated_embedding = self.embedding_service.generate_embedding(updated_content)
+            self.chroma_client.update_embedding(
+                memory_id=similar_memory.id,
+                embedding=updated_embedding,
+                document=updated_content,
+                user_id=user_id,
+                app_name=app_name
+            )
+            
+            return similar_memory
+        
         # 抽取要素
         extracted_elements = self.extract_elements(user_id, app_name, memory_content)
         
         # 计算过期时间
         expiry_time = self.calculate_expiry_time(user_id, app_name)
+        
+        # 设置记忆优先级（基于内容长度和要素数量）
+        priority = 3  # 默认优先级
+        if len(memory_content) > 1000:
+            priority = 4
+        if len(extracted_elements) > 5:
+            priority = 5
+        elif len(extracted_elements) < 2:
+            priority = 2
+        
+        # 自动生成记忆标签
+        tags = []
+        if "name" in extracted_elements:
+            tags.append("personal_info")
+        if "preference" in extracted_elements or "hobby" in extracted_elements:
+            tags.append("preference")
+        if "plan" in extracted_elements or "schedule" in extracted_elements:
+            tags.append("plan")
+        if "question" in extracted_elements or "problem" in extracted_elements:
+            tags.append("question")
         
         # 创建记忆对象
         memory = UserMemory(
@@ -153,6 +456,8 @@ class MemoryManager:
             app_name=app_name,
             memory_content=memory_content,
             extracted_elements=extracted_elements,
+            memory_priority=priority,
+            memory_tags=tags if tags else None,
             expiry_time=expiry_time,
             last_accessed_at=datetime.utcnow()
         )
@@ -161,8 +466,8 @@ class MemoryManager:
         self.db.commit()
         self.db.refresh(memory)
         
-        # 生成并存储Embedding
-        embedding = self.embedding_service.generate_embedding(memory_content)
+        # 生成并存储Embedding（使用缓存）
+        embedding = self.embedding_service.get_cached_embedding(memory_content)
         
         # 存储到Chroma
         self.chroma_client.add_embedding(
@@ -199,6 +504,8 @@ class MemoryManager:
         
         return memory
     
+
+    
     def query_memories(self, user_id: str, app_name: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """查询相似记忆
         
@@ -211,31 +518,137 @@ class MemoryManager:
         Returns:
             相似记忆列表
         """
-        # 生成查询Embedding
-        query_embedding = self.embedding_service.generate_embedding(query)
-        
-        # 查询Chroma
-        chroma_results = self.chroma_client.query_embeddings(
-            query_embedding=query_embedding,
-            user_id=user_id,
-            app_name=app_name,
-            top_k=top_k
-        )
-        
-        # 获取记忆对象并更新访问时间
-        results = []
-        for result in chroma_results:
-            memory = self.get_memory(result["memory_id"])
-            if memory:
+        try:
+            # 生成查询内容的Embedding（使用缓存）
+            query_embedding = self.embedding_service.get_cached_embedding(query)
+            
+            # 查询相似记忆
+            chroma_results = self.chroma_client.query_embeddings(
+                query_embedding=query_embedding,
+                user_id=user_id,
+                app_name=app_name,
+                top_k=top_k
+            )
+            
+            # 构建结果
+            results = []
+            for result in chroma_results:
+                # 获取记忆详情
+                memory = self.get_memory(result["memory_id"])
+                if memory:
+                    similarity = 1 - result["similarity"]  # Chroma返回的是距离，转换为相似度
+                    # 确保相似度在合理范围内
+                    similarity = max(0.0, min(1.0, similarity))
+                    results.append({
+                        "memory_id": memory.id,
+                        "memory_content": memory.memory_content,
+                        "extracted_elements": memory.extracted_elements,
+                        "similarity": similarity,
+                        "created_at": memory.created_at
+                    })
+            
+            return results
+        except Exception as e:
+            logger.error(f"Failed to query memories with embedding: {e}")
+            # 如果嵌入查询失败，回退到基于关键词的查询作为降级方案
+            # 获取该用户该应用下的所有记忆
+            memories = self.db.query(UserMemory).filter(
+                and_(
+                    UserMemory.user_id == user_id,
+                    UserMemory.app_name == app_name,
+                    UserMemory.is_active == True
+                )
+            ).all()
+            
+            # 对所有记忆进行相似度计算
+            memory_scores = []
+            
+            for memory in memories:
+                # 初始化相似度
+                similarity = 0.0
+                
+                # 只有当查询不为空时才计算相似度
+                if query:
+                    # 改进的文本匹配算法
+                    query_lower = query.lower()
+                    memory_lower = memory.memory_content.lower()
+                    
+                    # 完全匹配
+                    if query_lower == memory_lower:
+                        similarity = 1.0
+                    # 包含匹配
+                    elif query_lower in memory_lower:
+                        similarity = 0.8
+                    # 关键词匹配
+                    else:
+                        # 提取关键词
+                        query_words = set(query_lower.split())
+                        memory_words = set(memory_lower.split())
+                        
+                        if query_words or memory_words:
+                            # Jaccard相似度
+                            intersection = len(query_words.intersection(memory_words))
+                            union = len(query_words.union(memory_words))
+                            jaccard_similarity = intersection / union
+                            
+                            # 余弦相似度（基于词频）
+                            from collections import Counter
+                            query_counter = Counter(query_words)
+                            memory_counter = Counter(memory_words)
+                            
+                            # 计算点积
+                            dot_product = sum(query_counter[word] * memory_counter[word] for word in query_counter if word in memory_counter)
+                            
+                            # 计算模长
+                            query_norm = sum(count ** 2 for count in query_counter.values()) ** 0.5
+                            memory_norm = sum(count ** 2 for count in memory_counter.values()) ** 0.5
+                            
+                            # 计算余弦相似度
+                            cosine_similarity = dot_product / (query_norm * memory_norm) if query_norm * memory_norm > 0 else 0.0
+                            
+                            # 综合相似度：Jaccard相似度占40%，余弦相似度占60%
+                            similarity = 0.4 * jaccard_similarity + 0.6 * cosine_similarity
+                            
+                            # 确保相似度至少为0.1，避免返回0%相似度
+                            similarity = max(0.1, similarity)
+                        else:
+                            # 至少返回0.1的相似度，避免返回0%相似度
+                            similarity = 0.1
+                else:
+                    # 如果查询为空，返回所有记忆，相似度为0.5
+                    similarity = 0.5
+                
+                memory_scores.append({
+                    "memory": memory,
+                    "similarity": similarity
+                })
+            
+            # 按相似度降序排序
+            memory_scores.sort(key=lambda x: x["similarity"], reverse=True)
+            
+            # 取前top_k个结果
+            top_results = memory_scores[:top_k]
+            
+            # 构建最终结果
+            results = []
+            for item in top_results:
+                memory = item["memory"]
+                similarity = item["similarity"]
+                
+                # 更新最后访问时间
+                memory.last_accessed_at = datetime.utcnow()
+                self.db.commit()
+                self.db.refresh(memory)
+                
                 results.append({
                     "memory_id": memory.id,
                     "memory_content": memory.memory_content,
                     "extracted_elements": memory.extracted_elements,
-                    "similarity": 1 - result["similarity"],  # Chroma返回的是距离，转换为相似度
+                    "similarity": similarity,
                     "created_at": memory.created_at
                 })
-        
-        return results
+            
+            return results
     
     def delete_memory(self, memory_id: int) -> bool:
         """删除记忆
@@ -260,50 +673,6 @@ class MemoryManager:
         
         return False
     
-    def update_memory(self, memory_id: int, memory_content: Optional[str] = None, 
-                     extracted_elements: Optional[Dict[str, Any]] = None) -> Optional[UserMemory]:
-        """更新记忆
-        
-        Args:
-            memory_id: 记忆ID
-            memory_content: 新的记忆内容
-            extracted_elements: 新的抽取要素
-            
-        Returns:
-            更新后的记忆对象，不存在返回None
-        """
-        memory = self.db.query(UserMemory).filter(UserMemory.id == memory_id).first()
-        
-        if memory:
-            update_embedding = False
-            
-            if memory_content is not None:
-                memory.memory_content = memory_content
-                update_embedding = True
-            
-            if extracted_elements is not None:
-                memory.extracted_elements = extracted_elements
-            
-            memory.updated_at = datetime.utcnow()
-            
-            self.db.commit()
-            self.db.refresh(memory)
-            
-            # 如果记忆内容更新了，需要更新Embedding
-            if update_embedding:
-                embedding = self.embedding_service.generate_embedding(memory.memory_content)
-                self.chroma_client.update_embedding(
-                    memory_id=memory.id,
-                    embedding=embedding,
-                    document=memory.memory_content,
-                    user_id=memory.user_id,
-                    app_name=memory.app_name
-                )
-            
-            return memory
-        
-        return None
-    
     def get_memories_by_user_app(self, user_id: str, app_name: str) -> List[UserMemory]:
         """获取用户在特定应用下的所有记忆
         
@@ -320,6 +689,8 @@ class MemoryManager:
                 UserMemory.app_name == app_name,
                 UserMemory.is_active == True
             )
+        ).order_by(
+            UserMemory.last_accessed_at.desc()
         ).all()
         
         return memories

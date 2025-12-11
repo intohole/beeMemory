@@ -1,41 +1,36 @@
-# IDE配置
-.trae/
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
 # 数据库文件
 *.db
-*.sqlite3
+*.db-journal
 
-# Python虚拟环境
-venv/
-env/
-.env
+# 配置文件
+config.yaml
+
+# 数据目录
+chroma_data/
 
 # 日志文件
 *.log
 logs/
 
-# 依赖文件
-__pycache__/
-*.pyc
-*.pyo
+# Python虚拟环境
+venv/
+.env
+
+# IDE配置
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # 测试文件
-.coverage
-.pytest_cache/
+__pycache__/
+*.pyc
 
-# 构建文件
-build/
-dist/
-*.egg-info/
-
-# OS文件
+# 操作系统文件
 .DS_Store
 Thumbs.db
 
-# 其他
-.cache/
+# 其他临时文件
+*.tmp
+*.temp
+*.bak

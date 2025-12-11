@@ -1,35 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
+from app.core.logging import get_logger
 
 from app.db.session import get_db
-from app.models import MemoryConfig
 from app.schemas.memory import (
     ChatHistoryCreate,
     MemoryQuery,
     MemoryQueryResult,
-    MemoryConfigCreate,
-    MemoryConfigUpdate,
-    MemoryConfigResponse,
     APIResponse
 )
 from app.services.memory import MemoryManager
-from app.core.config import settings
 
-router = APIRouter(
-    prefix="/api/memory",
-    tags=["memory"],
-    responses={404: {"description": "Not found"}},
-)
+router = APIRouter()
 
 
-@router.post("/submit", response_model=APIResponse)
-async def submit_chat_history(
+logger = get_logger(__name__)
+
+
+def process_chat_history_background(
     chat_history: ChatHistoryCreate,
-    db: Session = Depends(get_db)
+    db: Session,
+    memory_id: str
 ):
-    """提交聊天历史，生成记忆"""
+    """后台处理聊天历史，生成记忆"""
     try:
+        logger.info(f"Processing chat history for memory_id: {memory_id}")
+        
         memory_manager = MemoryManager(db)
         
         # 存储聊天历史
@@ -42,17 +39,43 @@ async def submit_chat_history(
         # 生成记忆内容
         memory_content = memory_manager.generate_memory_content(chat_history.messages)
         
-        # 创建记忆
+        # 创建记忆，设置is_summary为True，避免重复总结
         memory = memory_manager.create_memory(
             user_id=chat_history.user_id,
             app_name=chat_history.app_name,
-            memory_content=memory_content
+            memory_content=memory_content,
+            is_summary=True
+        )
+        
+        logger.info(f"Memory generated successfully for memory_id: {memory_id}, actual memory_id: {memory.id}")
+    except Exception as e:
+        logger.error(f"Failed to process chat history for memory_id: {memory_id}: {str(e)}")
+
+
+@router.post("/submit", response_model=APIResponse)
+async def submit_chat_history(
+    chat_history: ChatHistoryCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """异步提交聊天历史，生成记忆"""
+    try:
+        # 生成唯一的记忆ID，用于异步处理
+        import uuid
+        memory_id = str(uuid.uuid4())
+        
+        # 立即返回响应，不阻塞
+        background_tasks.add_task(
+            process_chat_history_background,
+            chat_history, 
+            db, 
+            memory_id
         )
         
         return APIResponse(
             success=True,
-            message="Chat history submitted successfully",
-            data={"memory_id": memory.id}
+            message="Chat history submitted successfully, memory is being generated in background",
+            data={"memory_id": memory_id}
         )
     except Exception as e:
         raise HTTPException(
@@ -133,84 +156,39 @@ async def delete_memory(
         )
 
 
-@router.get("/config", response_model=APIResponse)
-async def get_memory_config(
+@router.get("/list", response_model=APIResponse)
+async def get_memories_list(
     user_id: str,
     app_name: str,
     db: Session = Depends(get_db)
 ):
-    """获取记忆配置"""
+    """获取用户在特定应用下的所有记忆列表"""
     try:
         memory_manager = MemoryManager(db)
         
-        # 获取或创建配置
-        config = memory_manager.get_or_create_config(user_id, app_name)
+        # 获取记忆列表
+        memories = memory_manager.get_memories_by_user_app(user_id, app_name)
         
-        # 转换为Schema格式
-        config_response = MemoryConfigResponse.model_validate(config)
+        # 构建结果
+        memory_list = []
+        for memory in memories:
+            memory_list.append({
+                "memory_id": memory.id,
+                "memory_content": memory.memory_content,
+                "extracted_elements": memory.extracted_elements,
+                "memory_tags": memory.memory_tags,
+                "memory_priority": memory.memory_priority,
+                "last_accessed_at": memory.last_accessed_at.isoformat(),
+                "created_at": memory.created_at.isoformat()
+            })
         
         return APIResponse(
             success=True,
-            message="Config retrieved successfully",
-            data={"config": config_response}
+            message="Memories retrieved successfully",
+            data={"memories": memory_list}
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get memory config: {str(e)}"
-        )
-
-
-@router.put("/config", response_model=APIResponse)
-async def update_memory_config(
-    user_id: str,
-    app_name: str,
-    config_update: MemoryConfigUpdate,
-    db: Session = Depends(get_db)
-):
-    """更新记忆配置"""
-    try:
-        # 获取配置
-        config = db.query(MemoryConfig).filter(
-            MemoryConfig.user_id == user_id,
-            MemoryConfig.app_name == app_name
-        ).first()
-        
-        if not config:
-            # 如果配置不存在，创建新配置
-            config = MemoryConfig(
-                user_id=user_id,
-                app_name=app_name,
-                extraction_prompt=config_update.extraction_prompt or settings.DEFAULT_EXTRACTION_PROMPT,
-                merge_threshold=config_update.merge_threshold or settings.DEFAULT_MERGE_THRESHOLD,
-                expiry_strategy=config_update.expiry_strategy or settings.DEFAULT_EXPIRY_STRATEGY,
-                expiry_days=config_update.expiry_days or settings.DEFAULT_EXPIRY_DAYS
-            )
-            db.add(config)
-        else:
-            # 更新配置
-            if config_update.extraction_prompt is not None:
-                config.extraction_prompt = config_update.extraction_prompt
-            if config_update.merge_threshold is not None:
-                config.merge_threshold = config_update.merge_threshold
-            if config_update.expiry_strategy is not None:
-                config.expiry_strategy = config_update.expiry_strategy
-            if config_update.expiry_days is not None:
-                config.expiry_days = config_update.expiry_days
-        
-        db.commit()
-        db.refresh(config)
-        
-        # 转换为Schema格式
-        config_response = MemoryConfigResponse.model_validate(config)
-        
-        return APIResponse(
-            success=True,
-            message="Config updated successfully",
-            data={"config": config_response}
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update memory config: {str(e)}"
+            detail=f"Failed to get memories list: {str(e)}"
         )

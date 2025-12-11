@@ -27,27 +27,81 @@ function loadMemories() {
     }
     
     // 发送请求
-    makeRequest(`/api/memory/config?user_id=${userId}&app_name=${appName}`, 'GET', {}, function(response) {
-        // 这里我们需要获取记忆列表，但当前API没有直接提供获取所有记忆的接口
-        // 我们可以添加一个新的API接口来支持这个功能
-        // 目前暂时显示提示信息
+    makeRequest(`/api/memory/list?user_id=${userId}&app_name=${appName}`, 'GET', {}, function(response) {
         const memoriesList = $('#memoriesList');
-        memoriesList.html(`
-            <div class="alert alert-info">
-                <i class="fa fa-info-circle"></i>
-                当前API暂不支持获取所有记忆列表功能。
-                <br>
-                您可以通过查询功能来查找特定记忆，或直接输入记忆ID进行删除。
-            </div>
+        const memories = response.data.memories;
+        
+        if (memories && memories.length > 0) {
+            let memoriesHtml = `
+                <h5 class="mb-3">记忆列表</h5>
+                <div class="memories-table-container">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>记忆ID</th>
+                                <th>内容</th>
+                                <th>优先级</th>
+                                <th>标签</th>
+                                <th>最后访问时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
             
-            <h5 class="mt-4 mb-3">直接删除记忆</h5>
-            <div class="input-group mb-3">
-                <input type="number" class="form-control" id="directMemoryId" placeholder="请输入记忆ID">
-                <button type="button" class="btn btn-danger" id="directDeleteBtn">
-                    <i class="fa fa-trash"></i> 删除
-                </button>
-            </div>
-        `);
+            memories.forEach(function(memory) {
+                // 格式化优先级
+                let priorityText = '';
+                if (memory.memory_priority === 5) priorityText = '<span class="badge bg-danger">最高</span>';
+                else if (memory.memory_priority === 4) priorityText = '<span class="badge bg-warning">高</span>';
+                else if (memory.memory_priority === 3) priorityText = '<span class="badge bg-info">中</span>';
+                else if (memory.memory_priority === 2) priorityText = '<span class="badge bg-secondary">低</span>';
+                else priorityText = '<span class="badge bg-light text-dark">最低</span>';
+                
+                // 格式化标签
+                const tagsHtml = memory.memory_tags && memory.memory_tags.length > 0 ? 
+                    memory.memory_tags.map(tag => `<span class="badge bg-primary me-1">${tag}</span>`).join('') : 
+                    '<span class="text-muted">无</span>';
+                
+                memoriesHtml += `
+                    <tr>
+                        <td>${memory.memory_id}</td>
+                        <td class="memory-content">${memory.memory_content.substring(0, 100)}${memory.memory_content.length > 100 ? '...' : ''}</td>
+                        <td>${priorityText}</td>
+                        <td>${tagsHtml}</td>
+                        <td>${formatDateTime(memory.last_accessed_at)}</td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm delete-memory" data-memory-id="${memory.memory_id}">
+                                <i class="fa fa-trash"></i> 删除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            memoriesHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            memoriesList.html(memoriesHtml);
+        } else {
+            memoriesList.html(`
+                <div class="alert alert-warning">
+                    <i class="fa fa-warning"></i>
+                    未找到相关记忆
+                </div>
+                
+                <h5 class="mt-4 mb-3">直接删除记忆</h5>
+                <div class="input-group mb-3">
+                    <input type="number" class="form-control" id="directMemoryId" placeholder="请输入记忆ID">
+                    <button type="button" class="btn btn-danger" id="directDeleteBtn">
+                        <i class="fa fa-trash"></i> 删除
+                    </button>
+                </div>
+            `);
+        }
         
         // 添加直接删除事件监听
         $('#directDeleteBtn').on('click', function() {

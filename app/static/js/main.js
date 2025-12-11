@@ -1,6 +1,6 @@
 // 主逻辑文件
 
-// 页面加载完成后执行
+// 初始化所有模块
 $(document).ready(function() {
     // 初始化所有模块
     initSubmitModule();
@@ -8,12 +8,7 @@ $(document).ready(function() {
     initManageModule();
     initConfigModule();
     
-    // 添加页面切换事件监听
-    $('.nav-link').on('click', function(e) {
-        // 更新导航栏激活状态
-        $('.nav-link').removeClass('active');
-        $(this).addClass('active');
-    });
+    // 使用Bootstrap 5内置的标签页功能，无需手动实现
 });
 
 // 通用AJAX请求函数

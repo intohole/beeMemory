@@ -125,6 +125,68 @@ class MemoryConfigResponse(BaseModel):
         from_attributes = True
 
 
+class BusinessTemplateCreate(BaseModel):
+    """业务模板创建Schema"""
+    template_name: str = Field(..., description="模板名称", min_length=1)
+    app_name: str = Field(..., description="应用名称", min_length=1)
+    extraction_prompt: str = Field(..., description="要素抽取提示词", min_length=1)
+    priority_fields: Optional[List[str]] = Field(None, description="优先级字段列表")
+    is_default: Optional[bool] = Field(False, description="是否为默认模板")
+
+
+class BusinessTemplateUpdate(BaseModel):
+    """业务模板更新Schema"""
+    template_name: Optional[str] = Field(None, description="模板名称", min_length=1)
+    extraction_prompt: Optional[str] = Field(None, description="要素抽取提示词", min_length=1)
+    priority_fields: Optional[List[str]] = Field(None, description="优先级字段列表")
+    is_default: Optional[bool] = Field(None, description="是否为默认模板")
+
+
+class BusinessTemplateResponse(BaseModel):
+    """业务模板响应Schema"""
+    template_id: int
+    template_name: str
+    app_name: str
+    extraction_prompt: str
+    priority_fields: Optional[List[str]]
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class MemoryPriorityCreate(BaseModel):
+    """记忆优先级创建Schema"""
+    user_id: str = Field(..., description="用户ID", min_length=1)
+    app_name: str = Field(..., description="应用名称", min_length=1)
+    content_type: str = Field(..., description="内容类型", min_length=1)
+    priority_level: int = Field(3, description="优先级等级", ge=1, le=5)
+    description: Optional[str] = Field(None, description="优先级描述")
+
+
+class MemoryPriorityUpdate(BaseModel):
+    """记忆优先级更新Schema"""
+    priority_level: Optional[int] = Field(None, description="优先级等级", ge=1, le=5)
+    description: Optional[str] = Field(None, description="优先级描述")
+
+
+class MemoryPriorityResponse(BaseModel):
+    """记忆优先级响应Schema"""
+    priority_id: int
+    user_id: str
+    app_name: str
+    content_type: str
+    priority_level: int
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
 class APIResponse(BaseModel):
     """通用API响应Schema"""
     success: bool = Field(..., description="请求是否成功")
