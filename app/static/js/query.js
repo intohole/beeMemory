@@ -70,9 +70,8 @@ function displayQueryResults(results) {
         let resultsHtml = '<h5 class="mb-3">查询结果</h5>';
         
         results.forEach(function(result) {
-            // Chroma返回的是距离，需要转换为相似度（相似度 = 1 - 距离）
-            const distance = result.similarity;
-            const similarity = 1 - distance;
+            // 后端已经将Chroma返回的距离转换为相似度，直接使用即可
+            const similarity = result.similarity;
             // 计算相似度百分比
             const similarityPercent = Math.round(similarity * 100);
             
