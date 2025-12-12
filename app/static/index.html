@@ -207,7 +207,28 @@
                         <form id="appConfigForm">
                             <div class="mb-4">
                                 <label for="extractionTemplate" class="form-label">提取模板</label>
-                                <textarea class="form-control" id="extractionTemplate" rows="4" placeholder="请输入提取模板，例如：\n{\n  \"user_intent\": \"用户意图\",\n  \"key_points\": \"关键点列表\",\n  \"entities\": \"实体列表\"\n}"></textarea>
+                                <textarea class="form-control" id="extractionTemplate" rows="6" placeholder="请输入提取模板，例如：\n请从以下记忆内容中提取关键信息，按照指定的字段格式返回JSON。\n\n记忆内容：\n{{memory_content}}\n\n请提取以下要素：\n{{fields_desc}}\n\n请严格按照以下要求返回：\n{{return_requirements}}"></textarea>
+                                <div class="mt-2 alert alert-info">
+                                    <h6><i class="fa fa-info-circle"></i> 支持的变量</h6>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <ul class="list-unstyled">
+                                                <li><strong>{{memory_content}}</strong> - 记忆内容</li>
+                                                <li><strong>{{fields_desc}}</strong> - 提取字段描述（带说明）</li>
+                                                <li><strong>{{field_list}}</strong> - 提取字段列表（仅名称）</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <ul class="list-unstyled">
+                                                <li><strong>{{field_count}}</strong> - 提取字段数量</li>
+                                                <li><strong>{{return_requirements}}</strong> - 返回要求和格式说明</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <small class="text-muted">提示：您可以在模板中自由使用这些变量，系统会自动替换为实际内容。</small>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="mb-4">
