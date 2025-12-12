@@ -57,22 +57,50 @@ function removeMessageItem(button) {
 // 提交聊天历史
 function submitChatHistory() {
     // 获取表单数据
-    const userId = $('#submitUserId').val();
-    const appName = $('#submitAppName').val();
+    const userId = $('#submitUserId').val().trim();
+    const appName = $('#submitAppName').val().trim();
     
     // 获取消息列表
     const messages = [];
+    let hasEmptyContent = false;
+    
     $('.message-item').each(function() {
         const role = $(this).find('[name="role"]').val();
         const content = $(this).find('[name="content"]').val().trim();
-        if (content) {
-            messages.push({ role, content });
+        
+        if (!content) {
+            hasEmptyContent = true;
+            return false; // 退出循环
         }
+        
+        messages.push({ role, content });
     });
     
     // 验证数据
-    if (!userId || !appName || messages.length === 0) {
-        showError('请填写所有必填字段');
+    if (!userId) {
+        showError('请填写用户ID');
+        $('#submitUserId').focus();
+        return;
+    }
+    
+    if (!appName) {
+        showError('请填写应用名称');
+        $('#submitAppName').focus();
+        return;
+    }
+    
+    if (hasEmptyContent) {
+        showError('所有消息内容不能为空');
+        return;
+    }
+    
+    if (messages.length === 0) {
+        showError('请至少添加一条消息');
+        return;
+    }
+    
+    if (messages.length > 20) {
+        showError('消息数量不能超过20条');
         return;
     }
     

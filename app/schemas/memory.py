@@ -96,7 +96,7 @@ class MemoryPriorityUpdate(BaseModel):
 
 class MemoryPriorityResponse(BaseModel):
     """记忆优先级响应Schema"""
-    priority_id: int
+    id: int
     user_id: str
     app_name: str
     content_type: str
@@ -107,6 +107,10 @@ class MemoryPriorityResponse(BaseModel):
     
     class Config:
         from_attributes = True
+    
+    @property
+    def priority_id(self) -> int:
+        return self.id
 
 
 class APIResponse(BaseModel):

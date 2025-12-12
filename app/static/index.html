@@ -33,6 +33,9 @@
                         <button class="nav-link" id="query-tab-tab" data-bs-toggle="tab" data-bs-target="#query-tab" type="button" role="tab" aria-controls="query-tab" aria-selected="false">查询记忆</button>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="chat-history-tab-tab" data-bs-toggle="tab" data-bs-target="#chat-history-tab" type="button" role="tab" aria-controls="chat-history-tab" aria-selected="false">查询聊天历史</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link" id="manage-tab-tab" data-bs-toggle="tab" data-bs-target="#manage-tab" type="button" role="tab" aria-controls="manage-tab" aria-selected="false">管理记忆</button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -378,6 +381,44 @@
                 </div>
             </div>
             
+            <!-- 查询聊天历史标签页 -->
+            <div class="tab-pane fade" id="chat-history-tab" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fa fa-comments"></i> 查询聊天历史
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="chatHistoryForm">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="chatHistoryUserId" class="form-label">用户ID</label>
+                                    <input type="text" class="form-control" id="chatHistoryUserId" placeholder="请输入用户ID" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="chatHistoryAppName" class="form-label">应用名称</label>
+                                    <input type="text" class="form-control" id="chatHistoryAppName" placeholder="请输入应用名称" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="chatHistorySessionId" class="form-label">会话ID（可选）</label>
+                                    <input type="text" class="form-control" id="chatHistorySessionId" placeholder="请输入会话ID">
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-end mt-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-search"></i> 查询
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <!-- 聊天历史结果 -->
+                        <div id="chatHistoryResults" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 配置列表标签页 -->
             <div class="tab-pane fade" id="config-list-tab" role="tabpanel">
                 <div class="card">
@@ -435,6 +476,7 @@
     <script src="/static/js/main.js"></script>
     <script src="/static/js/submit.js"></script>
     <script src="/static/js/query.js"></script>
+    <script src="/static/js/chat_history.js"></script>
     <script src="/static/js/manage.js"></script>
     <script src="/static/js/config.js"></script>
 </body>

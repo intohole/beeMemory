@@ -29,6 +29,7 @@ function loadMemories() {
     // 发送请求
     makeRequest(`/api/memory/list?user_id=${userId}&app_name=${appName}`, 'GET', {}, function(response) {
         const memoriesList = $('#memoriesList');
+        // API返回的是{ memories: [...] }，所以需要提取memories字段
         const memories = response.data.memories;
         
         if (memories && memories.length > 0) {
@@ -117,12 +118,21 @@ function loadMemories() {
 
 // 删除记忆
 function deleteMemory(memoryId) {
-    if (confirm(`确定要删除记忆ID为 ${memoryId} 的记忆吗？`)) {
-        // 发送删除请求
-        makeRequest(`/api/memory/${memoryId}`, 'DELETE', {}, function(response) {
-            showSuccess('记忆删除成功');
-            // 清空直接删除输入框
-            $('#directMemoryId').val('');
-        });
-    }
+    // 使用自定义确认对话框
+    showConfirm(
+        `确定要删除记忆ID为 ${memoryId} 的记忆吗？此操作不可恢复。`,
+        function() {
+            // 确认删除，发送请求
+            makeRequest(`/api/memory/${memoryId}`, 'DELETE', {}, function(response) {
+                showSuccess('记忆删除成功');
+                // 清空直接删除输入框
+                $('#directMemoryId').val('');
+                // 刷新记忆列表
+                loadMemories();
+            });
+        },
+        function() {
+            // 取消删除，不做任何操作
+        }
+    );
 }

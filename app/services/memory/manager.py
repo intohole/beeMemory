@@ -5,7 +5,7 @@ from sqlalchemy import and_, func
 import json
 import numpy as np
 
-from app.models import UserMemory, ChatHistory, MemoryEmbedding, AppConfig, UserAppConfig
+from app.models import UserMemory, ChatHistory, AppConfig
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -72,56 +72,6 @@ class MemoryManager:
             self.db.commit()
             self.db.refresh(config)
         
-        return config
-    
-    def get_user_app_config(self, user_id: str, app_name: str) -> Optional[UserAppConfig]:
-        """获取用户应用配置
-        
-        Args:
-            user_id: 用户ID
-            app_name: 应用名称
-            
-        Returns:
-            用户应用配置对象，不存在则返回None
-        """
-        return self.db.query(UserAppConfig).filter(
-            and_(
-                UserAppConfig.user_id == user_id,
-                UserAppConfig.app_name == app_name
-            )
-        ).first()
-    
-    def create_or_update_user_app_config(self, user_id: str, app_name: str, use_default: bool = True, custom_config: dict = None) -> UserAppConfig:
-        """创建或更新用户应用配置
-        
-        Args:
-            user_id: 用户ID
-            app_name: 应用名称
-            use_default: 是否使用默认配置
-            custom_config: 自定义配置
-            
-        Returns:
-            更新后的用户应用配置对象
-        """
-        config = self.get_user_app_config(user_id, app_name)
-        
-        if config:
-            # 更新现有配置
-            config.use_default = use_default
-            if custom_config:
-                config.custom_config = custom_config
-        else:
-            # 创建新配置
-            config = UserAppConfig(
-                user_id=user_id,
-                app_name=app_name,
-                use_default=use_default,
-                custom_config=custom_config
-            )
-            self.db.add(config)
-        
-        self.db.commit()
-        self.db.refresh(config)
         return config
     
     def update_app_config(self, app_name: str, **kwargs) -> AppConfig:
@@ -539,10 +489,15 @@ class MemoryManager:
                         "created_at": memory.created_at
                     })
             
+            # 如果Chroma查询返回空结果，进入降级方案
+            if not results:
+                logger.info("Chroma query returned empty results, falling back to keyword-based query")
+                raise Exception("Chroma query returned empty results")
+            
             return results
         except Exception as e:
             logger.error(f"Failed to query memories with embedding: {e}")
-            # 如果嵌入查询失败，回退到基于关键词的查询作为降级方案
+            # 如果嵌入查询失败或返回空结果，回退到基于关键词的查询作为降级方案
             # 获取该用户该应用下的所有记忆
             memories = self.db.query(UserMemory).filter(
                 and_(
@@ -686,3 +641,40 @@ class MemoryManager:
         ).all()
         
         return memories
+    
+    def get_chat_history(self, user_id: str, app_name: str, session_id: str = None) -> List[Dict[str, Any]]:
+        """获取聊天历史
+        
+        Args:
+            user_id: 用户ID
+            app_name: 应用名称
+            session_id: 会话ID（可选）
+            
+        Returns:
+            聊天历史列表
+        """
+        # 构建查询条件
+        query = self.db.query(ChatHistory).filter(
+            and_(
+                ChatHistory.user_id == user_id,
+                ChatHistory.app_name == app_name
+            )
+        )
+        
+        # 如果提供了session_id，添加到查询条件
+        if session_id:
+            query = query.filter(ChatHistory.session_id == session_id)
+        
+        # 按时间戳升序排列
+        chat_history = query.order_by(ChatHistory.timestamp.asc()).all()
+        
+        # 转换为字典列表
+        return [{
+            "id": chat.id,
+            "user_id": chat.user_id,
+            "app_name": chat.app_name,
+            "session_id": chat.session_id,
+            "role": chat.role,
+            "content": chat.content,
+            "timestamp": chat.timestamp.isoformat()
+        } for chat in chat_history]

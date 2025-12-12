@@ -14,7 +14,7 @@ class AppConfig(BaseSettings):
 
 class DatabaseConfig(BaseSettings):
     """数据库配置"""
-    url: str = Field(default="sqlite:///./memory.db", env="DATABASE_URL")
+    url: str = Field(default="sqlite:///./data/memory.db", env="DATABASE_URL")
 
 
 class LLMConfig(BaseSettings):
@@ -45,8 +45,8 @@ class ChromaConfig(BaseSettings):
     port: int = Field(default=8999, env="CHROMA_PORT")
     collection_name: str = Field(default="prompts", env="CHROMA_COLLECTION_NAME")
     timeout: int = Field(default=30, env="CHROMA_TIMEOUT")
-    persist_directory: Optional[str] = Field(default="./chroma_data", env="CHROMA_PERSIST_DIRECTORY")
-    use_persistent_client: bool = Field(default=True, env="CHROMA_USE_PERSISTENT_CLIENT")
+    persist_directory: Optional[str] = Field(default="./data/chroma_data", env="CHROMA_PERSIST_DIRECTORY")
+    use_persistent_client: bool = Field(default=False, env="CHROMA_USE_PERSISTENT_CLIENT")
 
 
 class SchedulerConfig(BaseSettings):

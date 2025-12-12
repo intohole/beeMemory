@@ -44,21 +44,6 @@ class UserMemory(Base):
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # 是否归档
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # 关系
-    embedding = relationship("MemoryEmbedding", back_populates="memory", uselist=False, cascade="all, delete-orphan")
-
-
-class MemoryEmbedding(Base):
-    """记忆Embedding表"""
-    __tablename__ = "memory_embeddings"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    memory_id: Mapped[int] = mapped_column(ForeignKey("user_memories.id"), unique=True, nullable=False)
-    embedding_vector: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-    
-    # 关系
-    memory = relationship("UserMemory", back_populates="embedding")
 
 
 class AppConfig(Base):
@@ -105,24 +90,6 @@ class AppConfig(Base):
     recency_score_weight: Mapped[float] = mapped_column(Float, default=0.2, nullable=False)  # 时效性权重
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-
-class UserAppConfig(Base):
-    """用户应用配置表，存储用户级别的应用配置"""
-    __tablename__ = "user_app_configs"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
-    app_name: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
-    use_default: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    custom_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # 复合唯一约束
-    __table_args__ = (
-        UniqueConstraint('user_id', 'app_name', name='_user_app_uc'),
-    )
 
 
 class ChatHistory(Base):

@@ -1,17 +1,13 @@
 from app.models.memory import (
     UserMemory,
-    MemoryEmbedding,
     ChatHistory,
     MemoryPriority,
-    AppConfig,
-    UserAppConfig
+    AppConfig
 )
 
 __all__ = [
     "UserMemory",
-    "MemoryEmbedding",
     "ChatHistory",
     "MemoryPriority",
-    "AppConfig",
-    "UserAppConfig"
+    "AppConfig"
 ]

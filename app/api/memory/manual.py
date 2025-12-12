@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
+from typing import List
 from app.db.session import get_db
 from app.models import UserMemory, AppConfig
 from app.schemas.memory import APIResponse
@@ -10,7 +11,7 @@ router = APIRouter()
 
 @router.put("/archive", response_model=APIResponse)
 async def archive_memory(
-    memory_id: int,
+    memory_id: int = Query(..., description="记忆ID"),
     db: Session = Depends(get_db)
 ):
     """归档记忆
@@ -51,7 +52,7 @@ async def archive_memory(
 
 @router.put("/unarchive", response_model=APIResponse)
 async def unarchive_memory(
-    memory_id: int,
+    memory_id: int = Query(..., description="记忆ID"),
     db: Session = Depends(get_db)
 ):
     """取消归档记忆
@@ -92,8 +93,8 @@ async def unarchive_memory(
 
 @router.put("/priority", response_model=APIResponse)
 async def update_memory_priority(
-    memory_id: int,
-    priority_level: int,
+    memory_id: int = Query(..., description="记忆ID"),
+    priority_level: int = Query(..., description="新的优先级级别", ge=1, le=5),
     db: Session = Depends(get_db)
 ):
     """更新记忆优先级
@@ -143,8 +144,8 @@ async def update_memory_priority(
 
 @router.put("/tags", response_model=APIResponse)
 async def update_memory_tags(
-    memory_id: int,
-    tags: list,
+    memory_id: int = Query(..., description="记忆ID"),
+    tags: List[str] = Query(..., description="标签列表"),
     db: Session = Depends(get_db)
 ):
     """更新记忆标签

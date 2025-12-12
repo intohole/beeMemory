@@ -192,3 +192,39 @@ async def get_memories_list(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get memories list: {str(e)}"
         )
+
+
+@router.get("/chat/history", response_model=APIResponse)
+async def get_chat_history(
+    user_id: str,
+    app_name: str,
+    session_id: str = None,
+    db: Session = Depends(get_db)
+):
+    """获取聊天历史记录
+    
+    Args:
+        user_id: 用户ID
+        app_name: 应用名称
+        session_id: 会话ID（可选）
+    """
+    try:
+        memory_manager = MemoryManager(db)
+        
+        # 获取聊天历史
+        chat_history = memory_manager.get_chat_history(
+            user_id=user_id,
+            app_name=app_name,
+            session_id=session_id
+        )
+        
+        return APIResponse(
+            success=True,
+            message="Chat history retrieved successfully",
+            data={"chat_history": chat_history}
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get chat history: {str(e)}"
+        )

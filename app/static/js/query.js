@@ -12,14 +12,39 @@ function initQueryModule() {
 // 查询记忆
 function queryMemories() {
     // 获取表单数据
-    const userId = $('#queryUserId').val();
-    const appName = $('#queryAppName').val();
+    const userId = $('#queryUserId').val().trim();
+    const appName = $('#queryAppName').val().trim();
     const query = $('#queryContent').val().trim();
     const topK = parseInt($('#queryTopK').val());
     
     // 验证数据
-    if (!userId || !appName || !query) {
-        showError('请填写所有必填字段');
+    if (!userId) {
+        showError('请填写用户ID');
+        $('#queryUserId').focus();
+        return;
+    }
+    
+    if (!appName) {
+        showError('请填写应用名称');
+        $('#queryAppName').focus();
+        return;
+    }
+    
+    if (!query) {
+        showError('请填写查询内容');
+        $('#queryContent').focus();
+        return;
+    }
+    
+    if (query.length < 2) {
+        showError('查询内容不能少于2个字符');
+        $('#queryContent').focus();
+        return;
+    }
+    
+    if (isNaN(topK) || topK < 1 || topK > 20) {
+        showError('返回数量必须是1-20之间的整数');
+        $('#queryTopK').val(5);
         return;
     }
     
@@ -45,8 +70,11 @@ function displayQueryResults(results) {
         let resultsHtml = '<h5 class="mb-3">查询结果</h5>';
         
         results.forEach(function(result) {
+            // Chroma返回的是距离，需要转换为相似度（相似度 = 1 - 距离）
+            const distance = result.similarity;
+            const similarity = 1 - distance;
             // 计算相似度百分比
-            const similarityPercent = Math.round(result.similarity * 100);
+            const similarityPercent = Math.round(similarity * 100);
             
             resultsHtml += `
                 <div class="result-item">
@@ -58,7 +86,7 @@ function displayQueryResults(results) {
                             相似度: ${similarityPercent}%
                         </div>
                     </div>
-                    <div class="result-content">${result.memory_content}</div>
+                    <div class="result-content">${result.document || result.memory_content}</div>
                     <div class="result-meta">
                         <span>创建时间: ${formatDateTime(result.created_at)}</span>
                         ${result.extracted_elements ? `<span>要素: ${JSON.stringify(result.extracted_elements)}</span>` : ''}

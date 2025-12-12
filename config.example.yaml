@@ -1,0 +1,70 @@
+# 应用配置
+app:
+  name: "MemoryService"
+  version: "1.0.0"
+  debug: false
+
+# 数据库配置
+database:
+  url: "sqlite:///./memory.db"
+
+# 大模型配置
+llm:
+  model: "glm-4-flash"
+  api_key: "your_llm_api_key"  # 通过环境变量 LLM__API_KEY 设置
+  base_url: "https://open.bigmodel.cn/api/paas/v4/"  # 智谱AI API地址
+  timeout: 360  # 超时时间（秒）
+  max_retries: 3  # 最大重试次数
+  temperature: 0.1  # 温度参数，控制生成文本的随机性
+  max_tokens: 2048  # 最大生成tokens数
+
+# 嵌入服务配置
+embedding:
+  model: "embedding-3"  # 智谱AI的embedding-3模型
+  api_key: "your_embedding_api_key"  # 留空则使用llm的api_key，通过环境变量 EMBEDDING__API_KEY 设置
+  base_url: "https://open.bigmodel.cn/api/paas/v4/"  # 智谱AI API地址
+  timeout: 30  # 超时时间（秒）
+  max_retries: 3  # 最大重试次数
+  dimension: 1536  # 嵌入向量维度
+  normalize: true  # 是否归一化向量
+
+# Chroma向量数据库配置
+chroma:
+  host: "localhost"  # Chroma服务主机
+  port: 8999  # Chroma服务端口
+  collection_name: "prompts"  # 集合名称
+  timeout: 30  # 超时时间（秒）
+  persist_directory: "./chroma_data"  # 本地持久化目录
+  use_persistent_client: true  # 是否使用本地持久化客户端，false则使用远程客户端
+
+# 定时任务配置
+scheduler:
+  merge_interval_minutes: 60  # 记忆合并任务间隔（分钟）
+  cleanup_interval_minutes: 1440  # 记忆清理任务间隔（分钟）
+
+# 记忆管理默认配置
+memory:
+  default_extraction_prompt: "Extract key elements from the following conversation. Focus on important facts, preferences, and any other information that should be remembered."
+  default_merge_threshold: 0.8  # 记忆合并的相似度阈值
+  default_expiry_strategy: "last_access"  # 记忆过期策略：never（永不过期）, last_access（基于最后访问时间）
+  default_expiry_days: 30  # 记忆过期天数
+  max_memories_per_user: 1000  # 每个用户的最大记忆数量
+  max_memories_per_app: 500  # 每个应用的最大记忆数量
+  embedding_cache_ttl: 604800  # 嵌入缓存有效期（秒），默认7天
+  llm_cache_ttl: 604800  # LLM提取结果缓存有效期（秒），默认7天
+  priority_weights:  # 记忆优先级权重配置
+    content_length: 0.3  # 内容长度权重
+    element_count: 0.4  # 要素数量权重
+    access_frequency: 0.3  # 访问频率权重
+
+# 日志配置
+logging:
+  level: "INFO"  # 日志级别：DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"  # 日志格式
+  file_path: null  # 日志文件路径，留空则只输出到控制台
+  max_size: 10485760  # 日志文件最大大小（字节），默认10MB
+  backup_count: 5  # 日志文件备份数量
+  use_json: false  # 是否使用JSON格式日志
+
+# 时区配置
+timezone: "Asia/Shanghai"  # 默认中国时区，支持IANA时区格式
