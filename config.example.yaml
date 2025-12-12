@@ -44,7 +44,7 @@ scheduler:
 
 # 记忆管理默认配置
 memory:
-  default_extraction_prompt: "Extract key elements from the following conversation. Focus on important facts, preferences, and any other information that should be remembered."
+  default_extraction_prompt: "Extract key elements from the following conversation. User intent, key points list, and entity list are mandatory fields that must be included. Focus on important facts, preferences, and any other information that should be remembered."
   default_merge_threshold: 0.8  # 记忆合并的相似度阈值
   default_expiry_strategy: "last_access"  # 记忆过期策略：never（永不过期）, last_access（基于最后访问时间）
   default_expiry_days: 30  # 记忆过期天数

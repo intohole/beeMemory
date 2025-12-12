@@ -52,7 +52,7 @@ class AppConfig(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     app_name: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    extraction_template: Mapped[str] = mapped_column(Text, nullable=False, default="请从以下内容中提取关键信息，按照指定的字段格式返回JSON。")
+    extraction_template: Mapped[str] = mapped_column(Text, nullable=False, default="请从以下内容中提取关键信息，按照指定的字段格式返回JSON。用户意图、关键点列表、实体列表是必须包含的关键字段，不可遗漏。")
     extraction_fields: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default={
         "user_intent": "用户的主要意图",
         "key_points": "关键点列表",

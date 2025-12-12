@@ -255,8 +255,16 @@ class MemoryManager:
         # 构建动态的抽取prompt，使用应用配置中的extraction_fields
         fields_desc = "\n".join([f"{key}: {desc}" for key, desc in app_config.extraction_fields.items()])
         
+        # 提取字段列表，用于模板变量渲染
+        field_list = list(app_config.extraction_fields.keys())
+        
+        # 渲染模板变量，替换模板中的{{field_list}}等变量
+        rendered_template = app_config.extraction_template
+        rendered_template = rendered_template.replace("{{field_list}}", ", ".join(field_list))
+        rendered_template = rendered_template.replace("{{field_count}}", str(len(field_list)))
+        
         # 构建统一的prompt
-        prompt = f"{app_config.extraction_template}\n\n记忆内容：\n{memory_content}\n\n请提取以下要素：\n{fields_desc}\n\n请严格按照以下要求返回：\n1. 使用JSON格式\n2. 键名必须与上述要素列表完全一致\n3. 每个键对应的值必须准确反映记忆中的内容\n4. 如果某个要素不存在，可省略该字段\n5. 不要添加任何额外内容\n\n请直接返回JSON结果："
+        prompt = f"{rendered_template}\n\n记忆内容：\n{memory_content}\n\n请提取以下要素：\n{fields_desc}\n\n请严格按照以下要求返回：\n1. 使用JSON格式\n2. 键名必须与上述要素列表完全一致\n3. 每个键对应的值必须准确反映记忆中的内容\n4. 如果某个要素不存在，可省略该字段\n5. 不要添加任何额外内容\n\n请直接返回JSON结果："
         
         # 调用LLM进行要素提取
         response = self.llm_service.generate_text(prompt, app_name=app_name)
