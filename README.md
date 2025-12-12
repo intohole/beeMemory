@@ -9,6 +9,7 @@
 ### 核心功能
 - ✅ 聊天历史提交与记忆生成
 - ✅ 基于嵌入向量的记忆查询（替代关键词相似度）
+- ✅ 聊天历史查询
 - ✅ 记忆的增删改查
 - ✅ 自动要素抽取（基于大模型）
 - ✅ 重复记忆自动合并
@@ -267,6 +268,7 @@ app/
 │       ├── main.js         # 主逻辑
 │       ├── submit.js       # 聊天历史提交
 │       ├── query.js        # 记忆查询
+│       ├── chat_history.js # 聊天历史查询
 │       ├── manage.js       # 记忆管理
 │       └── config.js       # 配置管理
 ├── utils/                  # 工具函数
@@ -484,6 +486,47 @@ PUT /api/memory/user/app/config?user_id=user123&app_name=myapp
 }
 ```
 
+### 11. 查询聊天历史
+
+```
+GET /api/memory/chat/history?user_id=user123&app_name=myapp&session_id=optional_session_id
+```
+
+**查询参数**:
+- `user_id` (必填): 用户ID
+- `app_name` (必填): 应用名称
+- `session_id` (可选): 会话ID，用于过滤特定会话的聊天记录
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "message": "Chat history retrieved successfully",
+  "data": {
+    "chat_history": [
+      {
+        "id": 1,
+        "user_id": "user123",
+        "app_name": "myapp",
+        "session_id": "session_123",
+        "role": "user",
+        "content": "你好，我是张三",
+        "timestamp": "2023-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "user_id": "user123",
+        "app_name": "myapp",
+        "session_id": "session_123",
+        "role": "assistant",
+        "content": "你好，张三，有什么可以帮助你的吗？",
+        "timestamp": "2023-01-01T00:00:01Z"
+      }
+    ]
+  }
+}
+```
+
 ## 前端功能
 
 ### 1. 聊天历史提交
@@ -516,6 +559,14 @@ PUT /api/memory/user/app/config?user_id=user123&app_name=myapp
 - 可调整相似度阈值
 - 支持配置优先级权重
 - 自动总结和要素提取开关
+
+### 6. 聊天历史查询
+- 支持按用户ID和应用名称查询聊天历史
+- 支持可选的会话ID过滤
+- 聊天记录按时间顺序显示
+- 区分用户和助手消息
+- 现代化的聊天界面设计
+- 支持多种消息样式
 
 ## 应用配置说明
 
@@ -668,6 +719,16 @@ gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8080
 - 监控异常访问情况
 
 ## 更新日志
+
+### v1.1.0 (2025-12-12)
+- 新增聊天历史查询功能
+- 新增聊天历史查询API端点
+- 新增聊天历史查询前端页面
+- 优化记忆查询API，修复空结果问题
+- 优化前端样式，修复tab白色文字问题
+- 改进聊天记录的显示效果
+- 增强应用级配置管理
+- 优化数据库查询性能
 
 ### v1.0.0 (2025-12-11)
 - 初始版本发布
