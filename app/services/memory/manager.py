@@ -258,13 +258,25 @@ class MemoryManager:
         # 提取字段列表，用于模板变量渲染
         field_list = list(app_config.extraction_fields.keys())
         
-        # 渲染模板变量，替换模板中的{{field_list}}等变量
-        rendered_template = app_config.extraction_template
-        rendered_template = rendered_template.replace("{{field_list}}", ", ".join(field_list))
-        rendered_template = rendered_template.replace("{{field_count}}", str(len(field_list)))
+        # 定义返回要求，作为模板变量
+        return_requirements = "1. 使用JSON格式\n2. 键名必须与上述要素列表完全一致\n3. 每个键对应的值必须准确反映记忆中的内容\n4. 如果某个要素不存在，可省略该字段\n5. 不要添加任何额外内容\n\n请直接返回JSON结果："
         
-        # 构建统一的prompt
-        prompt = f"{rendered_template}\n\n记忆内容：\n{memory_content}\n\n请提取以下要素：\n{fields_desc}\n\n请严格按照以下要求返回：\n1. 使用JSON格式\n2. 键名必须与上述要素列表完全一致\n3. 每个键对应的值必须准确反映记忆中的内容\n4. 如果某个要素不存在，可省略该字段\n5. 不要添加任何额外内容\n\n请直接返回JSON结果："
+        # 准备所有模板变量
+        template_vars = {
+            "field_list": ", ".join(field_list),
+            "field_count": str(len(field_list)),
+            "fields_desc": fields_desc,
+            "memory_content": memory_content,
+            "return_requirements": return_requirements
+        }
+        
+        # 渲染模板变量，支持多种模板变量
+        rendered_template = app_config.extraction_template
+        for var_name, var_value in template_vars.items():
+            rendered_template = rendered_template.replace(f"{{{{{var_name}}}}}", var_value)
+        
+        # 使用完全渲染后的模板作为最终prompt
+        prompt = rendered_template
         
         # 调用LLM进行要素提取
         response = self.llm_service.generate_text(prompt, app_name=app_name)
