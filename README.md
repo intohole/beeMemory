@@ -190,9 +190,35 @@ cp config.example.yaml config.yaml
 
 ### 5. 启动应用
 
+#### 使用启动脚本（推荐）
+
+项目提供了便捷的启动脚本 `start.sh`，支持配置端口、运行环境等参数：
+
 ```bash
-# 使用默认配置启动
+# 查看帮助信息
+./start.sh --help
+
+# 使用默认配置启动（开发环境，端口8080）
+./start.sh
+
+# 指定端口启动
+./start.sh --port 8000
+
+# 生产环境启动
+./start.sh --port 8000 --env production
+
+# 指定主机地址和配置文件
+./start.sh --host 127.0.0.1 --port 8081 --config config.prod.yaml
+```
+
+#### 直接使用uvicorn启动
+
+```bash
+# 使用默认配置启动（开发环境）
 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+
+# 生产环境启动
+uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
 ### 6. 访问应用
