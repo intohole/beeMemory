@@ -7,10 +7,28 @@ function initTooltips() {
     const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 }
 
+// 默认提取模板
+const defaultExtractionTemplate = `请从以下记忆内容中提取关键信息，按照指定的字段格式返回JSON。用户意图、关键点列表、实体列表是必须包含的关键字段，不可遗漏。
+
+记忆内容：
+{{memory_content}}
+
+请提取以下要素：
+{{fields_desc}}
+
+请严格按照以下要求返回：
+{{return_requirements}}`;
+
 // 初始化配置模块
 function initConfigModule() {
     // 初始化tooltip
     initTooltips();
+    
+    // 设置默认提取模板
+    setDefaultExtractionTemplate();
+    
+    // 当配置编辑标签页显示时，检查并设置默认模板
+    $('#config-edit-tab').on('shown.bs.tab', setDefaultExtractionTemplate);
     
     // 加载配置
     $('#loadAppConfig').on('click', loadAppConfig);
@@ -34,6 +52,15 @@ function initConfigModule() {
     $('#extractionFieldsList').on('click', '.remove-field', function() {
         $(this).closest('.extraction-field-item').remove();
     });
+}
+
+// 设置默认提取模板
+function setDefaultExtractionTemplate() {
+    const extractionTemplate = $('#extractionTemplate');
+    // 如果textarea为空，设置默认模板
+    if (!extractionTemplate.val().trim()) {
+        extractionTemplate.val(defaultExtractionTemplate);
+    }
 }
 
 // 提取字段HTML模板
